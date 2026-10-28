@@ -23,6 +23,7 @@
 #include "dma.h"
 #include "usart.h"
 #include "gpio.h"
+#include <stdio.h>
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
@@ -37,9 +38,12 @@ void proccesDmaData(uint8_t sign);
 
 
 /* Space for your global variables. */
-
+#define MAX_STRING_LEN   35      /* chars allowed after '#' */
+volatile uint32_t ms_tick = 0;     /* incremented every 1 ms */
 	// type your global variables here:
-
+letter_count_ letter_count;                 /* result, type from main.h */
+static char   rx_string[MAX_STRING_LEN + 1];/* received chars + '\0' */
+static volatile uint8_t string_ready = 0;   /* set here, cleared in main loop */
 
 int main(void)
 {
@@ -60,23 +64,41 @@ int main(void)
   /* Space for your local variables, callback registration ...*/
   USART2_RegisterCallback(proccesDmaData);
   	  //type your code here:
-
+  LL_SYSTICK_EnableIT();
   while (1)
   {
-	  /* Periodic transmission of information about DMA Rx buffer state.
-	   * Transmission frequency - 0.5Hz.
-	   * Message format - "Buffer capacity: %d bytes, occupied memory: %d bytes, load [in %]: %f%"
-	   * Example message (what I wish to see in terminal) - Buffer capacity: 1000 bytes, occupied memory: 231 bytes, load [in %]: 23.1%
-	   */
+	  static char     tx_msg[120];        /* static: DMA reads it after PutBuffer returns */
+	  static uint32_t last_status_time = 0;
+	  static uint8_t  status_pending = 0;
 
-	  /* Valid text string information transmission.
-	   * Transmission frequency - when new valid string is received.
-	   * Message format - "Valid string: %s, lower-case: %d, upper-case: %d"
-	   * Example message (what I wish to see in terminal) - Valid string: Platn15uborZnakov, lower-case: 13, upper-case: 2
-	   */
+	  if((ms_tick - last_status_time) >= 2000)
+	  {
+		  last_status_time += 2000;
+		  status_pending = 1;
+	  }
 
-  	  	  	  //type your code here:
-  }
+	  /* 2. Send only when the Tx DMA channel is free */
+	  if(!LL_DMA_IsEnabledChannel(DMA1, LL_DMA_CHANNEL_7))
+	  {
+		  if(string_ready)                       /* valid string has priority */
+		  {
+			  string_ready = 0;
+			  int len = sprintf(tx_msg,
+					  "Valid string: %s, lower-case: %d, upper-case: %d\r\n",
+					  rx_string, letter_count.lower_cnt, letter_count.upper_cnt);
+			  USART2_PutBuffer((uint8_t*)tx_msg, len);
+		  }
+		  else if(status_pending)
+		  {
+			  status_pending = 0;
+			  uint16_t occupied = USART2_GetRxBufferLoad();
+			  uint16_t load_x10 = (uint32_t)occupied * 1000 / DMA_USART2_BUFFER_SIZE;
+			  int len = sprintf(tx_msg,
+					  "Buffer capacity: %d bytes, occupied memory: %d bytes, load [in %%]: %d.%d%%\r\n",
+					  DMA_USART2_BUFFER_SIZE, occupied, load_x10 / 10, load_x10 % 10);
+			  USART2_PutBuffer((uint8_t*)tx_msg, len);
+		  }
+	  }  }
   /* USER CODE END 3 */
 }
 
