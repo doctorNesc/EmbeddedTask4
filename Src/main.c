@@ -58,7 +58,7 @@ int main(void)
   MX_USART2_UART_Init();
 
   /* Space for your local variables, callback registration ...*/
-
+  USART2_RegisterCallback(proccesDmaData);
   	  //type your code here:
 
   while (1)
@@ -117,11 +117,54 @@ void SystemClock_Config(void)
  */
 void proccesDmaData(uint8_t sign)
 {
-	/* Process received data */
+	typedef enum { WAITING, RECEIVING } state_t;
+	static state_t state = WAITING;
+	static uint8_t length = 0;               /* chars stored after '#' */
+	static uint8_t lower = 0, upper = 0;
 
-		// type your algorithm here:
+	switch(state)
+	{
+	case WAITING:
+		if(sign == '#')
+		{
+			length = 0;
+			lower = 0;
+			upper = 0;
+			state = RECEIVING;
+		}
+		/* any other char is ignored */
+		break;
+
+	case RECEIVING:
+		if(sign == '#')                       /* new start: restart */
+		{
+			length = 0;
+			lower = 0;
+			upper = 0;
+		}
+		else if(sign == '$')                  /* end: string is valid */
+		{
+			rx_string[length] = '\0';
+			letter_count.lower_cnt = lower;
+			letter_count.upper_cnt = upper;
+			string_ready = 1;
+			state = WAITING;
+		}
+		else
+		{
+			rx_string[length++] = (char)sign;
+			if(sign >= 'a' && sign <= 'z') lower++;
+			else if(sign >= 'A' && sign <= 'Z') upper++;
+
+			/* 35 chars received and none was '$' -> discard */
+			if(length >= MAX_STRING_LEN)
+			{
+				state = WAITING;
+			}
+		}
+		break;
+	}
 }
-
 
 void Error_Handler(void)
 {
