@@ -36,7 +36,7 @@ void USART2_RegisterCallback(void *callback)
 }
 
 /* Space for global variables, if you need them */
-
+#define DMA_USART2_MAX_MESSAGE_LEN   20
 	// type global variables here
 
 
@@ -148,9 +148,44 @@ void USART2_PutBuffer(uint8_t *buffer, uint8_t length)
  */
 void USART2_CheckDmaReception(void)
 {
-	//type your implementation here
-}
+	/* Index of the first byte not yet passed to the callback */
+	static uint16_t old_pos = 0;
+	uint16_t pos;
 
+	if(USART2_ProcessData == 0) return;
+
+	/* 1. Bytes written by DMA so far */
+	pos = DMA_USART2_BUFFER_SIZE - LL_DMA_GetDataLength(DMA1, LL_DMA_CHANNEL_6);
+
+	/* 2. Forward all new bytes for processing */
+	while(old_pos < pos)
+	{
+		USART2_ProcessData(bufferUSART2dma[old_pos]);
+		old_pos++;
+	}
+
+	/* 3. Not enough room for another 20 character message? Restart DMA. */
+	if((DMA_USART2_BUFFER_SIZE - pos) < DMA_USART2_MAX_MESSAGE_LEN)
+	{
+		/* Stop DMA first, so the counter can no longer change */
+		LL_DMA_DisableChannel(DMA1, LL_DMA_CHANNEL_6);
+
+		/* A byte may have arrived since step 1: process it, so nothing is lost */
+		pos = DMA_USART2_BUFFER_SIZE - LL_DMA_GetDataLength(DMA1, LL_DMA_CHANNEL_6);
+		while(old_pos < pos)
+		{
+			USART2_ProcessData(bufferUSART2dma[old_pos]);
+			old_pos++;
+		}
+
+		/* Reload the channel and start from the beginning of the buffer */
+		LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_6, (uint32_t)bufferUSART2dma);
+		LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_6, DMA_USART2_BUFFER_SIZE);
+		LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_6);
+
+		old_pos = 0;
+	}
+}
 
 
 
