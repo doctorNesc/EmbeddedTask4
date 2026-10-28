@@ -72,12 +72,27 @@ void MX_USART2_UART_Init(void)
   /* USART2_RX Init */
 
   	  // type DMA USART Rx configuration here
-
-
+  LL_DMA_SetDataTransferDirection(DMA1, LL_DMA_CHANNEL_6, LL_DMA_DIRECTION_PERIPH_TO_MEMORY);
+  LL_DMA_SetChannelPriorityLevel(DMA1, LL_DMA_CHANNEL_6, LL_DMA_PRIORITY_HIGH);
+  LL_DMA_SetMode(DMA1, LL_DMA_CHANNEL_6, LL_DMA_MODE_NORMAL);
+  LL_DMA_SetPeriphIncMode(DMA1, LL_DMA_CHANNEL_6, LL_DMA_PERIPH_NOINCREMENT);
+  LL_DMA_SetMemoryIncMode(DMA1, LL_DMA_CHANNEL_6, LL_DMA_MEMORY_INCREMENT);
+  LL_DMA_SetPeriphSize(DMA1, LL_DMA_CHANNEL_6, LL_DMA_PDATAALIGN_BYTE);
+  LL_DMA_SetMemorySize(DMA1, LL_DMA_CHANNEL_6, LL_DMA_MDATAALIGN_BYTE);
+  LL_DMA_SetPeriphAddress(DMA1, LL_DMA_CHANNEL_6, LL_USART_DMA_GetRegAddr(USART2, LL_USART_DMA_REG_DATA_RECEIVE));
+  LL_DMA_SetMemoryAddress(DMA1, LL_DMA_CHANNEL_6, (uint32_t)bufferUSART2dma);
+  LL_DMA_SetDataLength(DMA1, LL_DMA_CHANNEL_6, DMA_USART2_BUFFER_SIZE);
   /* USART2_TX Init */
 
 	  // type DMA USART Tx configuration here
-
+  LL_DMA_SetDataTransferDirection(DMA1, LL_DMA_CHANNEL_7, LL_DMA_DIRECTION_MEMORY_TO_PERIPH);
+  LL_DMA_SetChannelPriorityLevel(DMA1, LL_DMA_CHANNEL_7, LL_DMA_PRIORITY_HIGH);
+  LL_DMA_SetMode(DMA1, LL_DMA_CHANNEL_7, LL_DMA_MODE_NORMAL);
+  LL_DMA_SetPeriphIncMode(DMA1, LL_DMA_CHANNEL_7, LL_DMA_PERIPH_NOINCREMENT);
+  LL_DMA_SetMemoryIncMode(DMA1, LL_DMA_CHANNEL_7, LL_DMA_MEMORY_INCREMENT);
+  LL_DMA_SetPeriphSize(DMA1, LL_DMA_CHANNEL_7, LL_DMA_PDATAALIGN_BYTE);
+  LL_DMA_SetMemorySize(DMA1, LL_DMA_CHANNEL_7, LL_DMA_MDATAALIGN_BYTE);
+  LL_DMA_SetPeriphAddress(DMA1, LL_DMA_CHANNEL_7, LL_USART_DMA_GetRegAddr(USART2, LL_USART_DMA_REG_DATA_TRANSMIT));
 
   /* USART2 interrupt Init */
   NVIC_SetPriority(USART2_IRQn, 0);
@@ -95,8 +110,20 @@ void MX_USART2_UART_Init(void)
   LL_USART_DisableIT_CTS(USART2);
 
   /* Enable USART2 peripheral and interrupts*/
-
+  LL_DMA_EnableIT_TC(DMA1, LL_DMA_CHANNEL_6);
+  LL_DMA_EnableIT_TE(DMA1, LL_DMA_CHANNEL_6);
+  LL_DMA_EnableIT_TE(DMA1, LL_DMA_CHANNEL_7);
   	  //type your code here:
+  /* Let the USART trigger DMA transfers */
+  LL_USART_EnableDMAReq_RX(USART2);
+  LL_USART_EnableDMAReq_TX(USART2);
+
+  /* Interrupt when the Rx line goes idle (end of a message) */
+  LL_USART_EnableIT_IDLE(USART2);
+
+  /* Start receiving: channel first, then USART */
+  LL_DMA_EnableChannel(DMA1, LL_DMA_CHANNEL_6);
+  LL_USART_Enable(USART2);
 }
 
 
